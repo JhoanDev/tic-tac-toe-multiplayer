@@ -1,24 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-const WEBSOCKET_URL = 'wss://0vj6zn1h39.execute-api.us-east-1.amazonaws.com/dev/'; // URL do WebSocket
+const WEBSOCKET_URL = 'wss://0vj6zn1h39.execute-api.us-east-1.amazonaws.com/dev/';
+
+let xpontos = 0;
+let opontos = 0;
 
 function App() {
     const [tabuleiro, setTabuleiro] = useState(Array(9).fill(null));
-    const [jogador, setJogador] = useState(null); // "X" ou "O"
+    const [jogador, setJogador] = useState(null);
     const [partidaId, setPartidaId] = useState(null);
     const [vezDe, setVezDe] = useState("X");
     const [vencedor, setVencedor] = useState(null);
-    const [playerId, setPlayerId] = useState(null); // ID único para o jogador
-    const [pontuacao, setPontuacao] = useState({ X: 0, O: 0 }); // Pontuação de X e O
+    const [playerId, setPlayerId] = useState(null);
+    const [pontuacao, setPontuacao] = useState({ X: 0, O: 0 });
     const [inputPartidaId, setInputPartidaId] = useState('');
     const [loading, setLoading] = useState(false);
     const [mensagemStatus, setMensagemStatus] = useState('');
-    const [aguardandoJogador2, setAguardandoJogador2] = useState(false); // Estado para aguardar o segundo jogador
-    const [mensagemJogador, setMensagemJogador] = useState(''); // Mensagem fixa: "Você é o jogador X/O"
+    const [aguardandoJogador2, setAguardandoJogador2] = useState(false);
+    const [mensagemJogador, setMensagemJogador] = useState('');
     const socketRef = useRef(null);
 
-    // Função para enviar mensagens pelo WebSocket
     const enviarMensagem = (mensagem) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             socketRef.current.send(mensagem);
@@ -28,9 +30,8 @@ function App() {
         }
     };
 
-    // Conectar ao WebSocket ao carregar o componente
     useEffect(() => {
-        const id = uuidv4(); // Gerar um ID único para o jogador
+        const id = uuidv4();
         setPlayerId(id);
         const conectarWebSocket = () => {
             socketRef.current = new WebSocket(WEBSOCKET_URL);
@@ -42,6 +43,7 @@ function App() {
                 try {
                     const data = JSON.parse(event.data);
                     console.log('Mensagem recebida:', data);
+                    console.log(data.pontuacaoX);
 
                     if (data.erro) {
                         setMensagemStatus(`Erro: ${data.erro}`);
@@ -50,16 +52,14 @@ function App() {
                     }
 
                     if (data.action === 'atualizarPartida') {
-                        console.log('Atualizando estado da partida:', data);
                         setPartidaId(data.partidaId);
-                        setJogador(data.jogador); // Define o jogador atual ("X" ou "O")
-                        setTabuleiro(data.estadoDoTabuleiro); // Atualiza o tabuleiro
-                        setVezDe(data.vezDe); // Atualiza a vez do jogador
+                        setJogador(data.jogador);
+                        setTabuleiro(data.estadoDoTabuleiro);
+                        setVezDe(data.vezDe);
                         setVencedor(data.vencedor);
-                        setAguardandoJogador2(!data.jogadorO); // Aguarda jogador 2 se ele ainda não entrou
-                        setPontuacao({ X: data.pontuacaoX, O: data.pontuacaoO }); // Atualiza a pontuação
+                        setAguardandoJogador2(!data.jogadorO);
+                        setPontuacao({ X: data.pontuacaoX, O: data.pontuacaoO });
 
-                        // Define a mensagem fixa "Você é o jogador X/O" apenas uma vez
                         if (!mensagemJogador) {
                             setMensagemJogador(`Você é o jogador ${data.jogador}`);
                         }
@@ -69,11 +69,10 @@ function App() {
                     }
 
                     if (data.message === 'Jogada registrada!') {
-                        console.log('Jogada registrada:', data);
-                        setTabuleiro(data.estadoDoTabuleiro); // Atualiza o tabuleiro
-                        setVezDe(data.vezDe); // Atualiza a vez do jogador
+                        setTabuleiro(data.estadoDoTabuleiro);
+                        setVezDe(data.vezDe);
                         setVencedor(data.vencedor);
-                        setPontuacao({ X: data.pontuacaoX, O: data.pontuacaoO }); // Atualiza a pontuação
+                        setPontuacao({ X: data.pontuacaoX, O: data.pontuacaoO });
                         setLoading(false);
                         return;
                     }
@@ -100,42 +99,39 @@ function App() {
         };
     }, []);
 
-    // Criar uma nova partida
     const iniciarPartida = async () => {
-        console.log('Iniciando nova partida...');
         setLoading(true);
-        setAguardandoJogador2(true); // Iniciar estado de espera
+        setAguardandoJogador2(true);
         const mensagem = JSON.stringify({ action: 'iniciarPartida', playerId });
         enviarMensagem(mensagem);
     };
 
-    // Entrar em uma partida existente
     const entrarNaPartida = async () => {
         if (!inputPartidaId) {
             setMensagemStatus('Digite o ID da partida.');
             return;
         }
-        console.log('Entrando na partida:', inputPartidaId);
         setLoading(true);
         const mensagem = JSON.stringify({ action: 'entrarPartida', playerId, partidaId: inputPartidaId });
         enviarMensagem(mensagem);
     };
 
-    // Fazer uma jogada
     const fazerJogada = (posicao) => {
         if (tabuleiro[posicao] || vencedor || !jogador || loading || vezDe !== jogador || aguardandoJogador2) {
-            console.log('Jogada inválida:', { posicao, tabuleiro, jogador, vezDe, vencedor, loading, aguardandoJogador2 });
             return;
         }
-        console.log('Fazendo jogada na posição:', posicao);
         setLoading(true);
         const mensagem = JSON.stringify({ action: 'jogada', partidaId, posicao, jogador, playerId });
         enviarMensagem(mensagem);
     };
 
-    // Renderizar o tabuleiro
+    const reiniciarPartida = async () => {
+        setLoading(true);
+        const mensagem = JSON.stringify({ action: 'reiniciarPartida', partidaId, playerId });
+        enviarMensagem(mensagem);
+    };
+
     const renderTabuleiro = () => {
-        console.log('Renderizando tabuleiro:', tabuleiro);
         return tabuleiro.map((valor, index) => (
             <div
                 key={index}
@@ -149,7 +145,6 @@ function App() {
         ));
     };
 
-    // Determinar a mensagem da vez
     const mensagemVez = () => {
         if (vezDe === jogador) {
             return 'Sua vez';
@@ -200,11 +195,6 @@ function App() {
                             {mensagemStatus}
                         </p>
                     )}
-                    {mensagemJogador && (
-                        <p className="text-lg mb-6 text-green-400">
-                            {mensagemJogador}
-                        </p>
-                    )}
                     {aguardandoJogador2 && (
                         <p className="text-lg mb-6 text-yellow-400 animate-pulse">
                             Aguardando o segundo jogador...
@@ -226,9 +216,17 @@ function App() {
                     <div className="mt-6 text-center">
                         <p className="text-lg text-gray-300">Pontuação:</p>
                         <p className="text-xl font-bold">
-                            <span className="text-blue-400">X: 0</span> | <span className="text-yellow-400">O: 0</span>
+                            <span className="text-blue-400">X: {pontuacao.X||xpontos}</span> | <span className="text-yellow-400">O: {pontuacao.O||opontos}</span>
                         </p>
                     </div>
+                    {vencedor && (
+                        <button
+                            onClick={reiniciarPartida}
+                            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 active:bg-green-700 transition-colors font-semibold text-lg"
+                        >
+                            Reiniciar Partida
+                        </button>
+                    )}
                 </>
             )}
         </div>
