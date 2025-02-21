@@ -1,6 +1,6 @@
 {
-  "name": "jogo da velha",
-  "short_name": "TicTacToe",
+  "name": "XOX Battle ",
+  "short_name": "XOX",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
